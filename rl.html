@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reinforcement Learning Visualizer Suite</title>
+    <style>
+        /* --- GLOBAL STYLES --- */
+        :root {
+            --mc-color: #007bff; --td-color: #17a2b8; --q-learning-color: #fd7e14; --sarsa-color: #6610f2; --dqn-color: #20c997; --ddqn-color: #6f42c1;
+            --secondary-color: #6c757d; --background-color: #f0f2f5; --card-background: #ffffff; --text-color: #212529; --border-color: #dee2e6;
+            --goal-color: #28a745; --trap-color: #dc3545; --dot-in: #28a745; --dot-out: #dc3545;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding-top: 60px; background-color: var(--background-color); color: var(--text-color); }
+        .container { width: 95%; max-width: 1400px; margin: 0 auto; padding: 20px 15px; }
+        canvas { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--border-color); }
+        
+        /* --- NAVIGATION BAR --- */
+        nav { position: fixed; top: 0; left: 0; right: 0; background-color: var(--card-background); box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 1000; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .nav-links { display: flex; justify-content: center; list-style: none; margin: 0; padding: 0; }
+        .nav-links a { display: block; padding: 15px 20px; text-decoration: none; color: var(--secondary-color); font-weight: 500; transition: color 0.2s, border-bottom 0.2s; border-bottom: 3px solid transparent; }
+        .nav-links a.active { color: var(--active-color, #000); border-bottom-color: var(--active-color, #000); }
+
+        /* --- PAGE SECTIONS & MODULES --- */
+        .page { display: none; }
+        .page.active { display: block; }
+        header { text-align: center; margin-bottom: 30px; }
+        header h1 { margin-bottom: 10px; font-size: 2.2em; }
+        header p { font-size: 1.2em; color: var(--secondary-color); }
+        
+        .module { background-color: var(--card-background); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        .module h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; font-size: 1.6em; }
+        
+        /* --- LAYOUT & CONTROLS --- */
+        .interactive-area { display: flex; gap: 25px; flex-wrap: wrap; }
+        .visualization { flex: 2; min-width: 280px; display: flex; justify-content: center; align-items: center; }
+        .controls { flex: 1; min-width: 280px; }
+        
+        .control-group { margin-bottom: 20px; }
+        .control-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        button { color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; transition: background-color 0.2s; margin-right: 10px; margin-bottom: 5px; }
+        button:disabled { background-color: var(--secondary-color); cursor: not-allowed; }
+        .results-display { background-color: #e9ecef; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .results-display p { margin: 5px 0; font-family: "Courier New", Courier, monospace; font-weight: bold; }
+        input[type="range"], select { width: 100%; }
+
+        /* Explanation & Voice */
+        .explanation { margin-top: 25px; padding: 20px; border-radius: 8px; border-left-width: 5px; border-left-style: solid; }
+        .explanation h3 { margin-top: 0; }
+        .voice-controls { margin-top: 15px; }
+        .listen-btn { background-color: var(--goal-color); }
+        .stop-btn { background-color: var(--trap-color); display: none; }
+
+        /* --- ALGORITHM-SPECIFIC STYLES --- */
+        #page-mc header h1, #page-mc .module h2 { color: var(--mc-color); }
+        #page-mc .explanation { background-color: #f0f7ff; border-left-color: var(--mc-color); }
+        #page-mc .module button { background-color: var(--mc-color); } #page-mc .module button:hover { background-color: #0056b3; }
+
+        #page-td header h1, #page-td .module h2 { color: var(--td-color); }
+        #page-td .explanation { background-color: #e8f9fb; border-left-color: var(--td-color); }
+        #page-td .module button { background-color: var(--td-color); } #page-td .module button:hover { background-color: #117a8b; }
+
+        #page-q header h1, #page-q .module h2 { color: var(--q-learning-color); }
+        #page-q .explanation { background-color: #fff9f3; border-left-color: var(--q-learning-color); }
+        #page-q .module button { background-color: var(--q-learning-color); } #page-q .module button:hover { background-color: #d96d0f; }
+
+        #page-sarsa header h1, #page-sarsa .module h2 { color: var(--sarsa-color); }
+        #page-sarsa .explanation { background-color: #f4f0fa; border-left-color: var(--sarsa-color); }
+        #page-sarsa .sarsa-color { color: var(--sarsa-color); } #page-sarsa .q-learning-color { color: var(--q-learning-color); }
+        
+        #page-dqn header h1, #page-dqn .module h2 { color: var(--ddqn-color); }
+        #page-dqn .explanation { background-color: #f5f2fa; border-left-color: var(--ddqn-color); }
+        #page-dqn .main-net-color { color: #007bff; } #page-dqn .target-net-color { color: #dc3545; }
+        #page-dqn .main-layout { display: flex; gap: 20px; flex-wrap: wrap; }
+        #page-dqn .panel { border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: #fff; }
+        #page-dqn .panel h3 { text-align: center; margin-top: 0; color: var(--secondary-color); }
+        #page-dqn .environment-panel, #page-dqn .memory-panel, #page-dqn .brains-panel { flex: 1; min-width: 280px; }
+        #page-dqn #dqn-replay-buffer { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 5px; display: flex; flex-direction: column-reverse; }
+        #page-dqn .memory-item { font-family: "Courier New", monospace; font-size: 0.8em; padding: 4px; border-radius: 3px; margin-bottom: 3px; background-color: #e9ecef; white-space: nowrap; transition: background-color 0.5s; }
+        #page-dqn .memory-item.sampling { background-color: #ffc107; }
+        #page-dqn .network-box { border: 1px solid var(--border-color); padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        #page-dqn #dqn-target-update-progress-bar { width: 100%; height: 20px; background-color: #e9ecef; border-radius: 5px; overflow: hidden; }
+        #page-dqn #dqn-target-update-progress { width: 0%; height: 100%; transition: width 0.1s linear; }
+        #page-dqn #dqn-calculation-box { border: 2px solid; padding: 15px; margin-top: 15px; border-radius: 5px; font-family: "Courier New", monospace; font-size: 0.9em; opacity: 0; transition: opacity 0.3s; }
+        #page-dqn #dqn-calculation-box.visible { opacity: 1; }
+        
+        /* Responsive */
+        @media (max-width: 992px) { #page-dqn .main-layout { flex-direction: column; } }
+        @media (max-width: 768px) {
+            body { padding-top: 50px; } .nav-links { justify-content: flex-start; } .nav-links a { padding: 12px 15px; font-size: 0.9em; }
+            .interactive-area { flex-direction: column; } header h1 { font-size: 1.8em; } .module h2 { font-size: 1.4em; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <ul class="nav-links">
+            <li><a href="#mc" data-page="page-mc" style="--active-color: var(--mc-color);">Monte Carlo</a></li>
+            <li><a href="#td" data-page="page-td" style="--active-color: var(--td-color);">TD Learning</a></li>
+            <li><a href="#q" data-page="page-q" style="--active-color: var(--q-learning-color);">Q-Learning</a></li>
+            <li><a href="#sarsa" data-page="page-sarsa" style="--active-color: var(--sarsa-color);">SARSA</a></li>
+            <li><a href="#dqn" data-page="page-dqn" style="--active-color: var(--ddqn-color);">DQN</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        
+        <!-- ======================= MONTE CARLO PAGE ======================= -->
+        <section id="page-mc" class="page">
+            <header><h1>Monte Carlo Methods</h1><p>Learning from completed experiences to solve problems with randomness.</p></header>
+            <div class="module">
+                <h2>Estimating Pi (π) with Random Dots</h2>
+                <div class="interactive-area">
+                    <div class="visualization"><svg id="mc-pi-svg" width="300" height="300"><rect width="300" height="300" fill="#f0f0f0"></rect><path d="M 0 300 A 300 300 0 0 1 300 0 L 0 0 Z" fill="#ffffff"></path></svg></div>
+                    <div class="controls">
+                        <div class="control-group"><button id="mc-pi-start-btn">Start</button><button id="mc-pi-reset-btn">Reset</button></div>
+                        <div class="control-group"><label>Speed: <span id="mc-pi-speed-value">50</span> dots/frame</label><input type="range" id="mc-pi-speed" min="1" max="500" value="50"></div>
+                        <div class="results-display"><p>Total Dots: <span id="mc-pi-total-dots">0</span></p><p>In Circle: <span id="mc-pi-inside-dots">0</span></p><p>Pi (π) ≈ <span id="mc-pi-estimate">0.0000</span></p></div>
+                    </div>
+                </div>
+                <div class="explanation">
+                    <h3>How it Works</h3>
+                    <p class="explanation-text">We drop random dots into a square. By counting the proportion of dots that also fall inside the inscribed quarter-circle, we can estimate Pi. The more dots we add, the more accurate our estimate becomes, demonstrating the law of large numbers.</p>
+                    <div class="voice-controls"><button class="listen-btn">🔊 Listen</button><button class="stop-btn">🔇 Stop</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TD LEARNING PAGE ======================= -->
+        <section id="page-td" class="page">
+            <header><h1>Temporal-Difference (TD) Learning</h1><p>Learning from every step, without waiting for the final outcome.</p></header>
+            <div class="module">
+                <h2>The Grid World Challenge</h2>
+                <div class="interactive-area">
+                    <div class="visualization"><canvas id="td-canvas" width="400" height="400"></canvas></div>
+                    <div class="controls">
+                        <div class="control-group"><label>Algorithm</label><select id="td-algorithm-selector"><option value="td">Temporal-Difference (TD)</option><option value="mc">Monte Carlo (MC)</option></select></div>
+                        <div class="control-group"><label>Learning Rate (α): <span id="td-alpha-value">0.1</span></label><input type="range" id="td-alpha-slider" min="0.01" max="1" step="0.01" value="0.1"></div>
+                        <div class="control-group"><button id="td-start-btn">Start</button><button id="td-reset-btn">Reset</button></div>
+                        <div class="results-display"><p>Episodes: <span id="td-episode-count">0</span></p><p>Steps: <span id="td-step-count">0</span></p></div>
+                    </div>
+                </div>
+                <div class="explanation">
+                    <h3>How It Works</h3>
+                    <p class="explanation-text">The agent learns the "value" of each square. With TD Learning, it updates the value of a square immediately after stepping away, using its current estimate of the next state's value (bootstrapping). With Monte Carlo, it must wait until the episode ends to update all visited squares. Notice how TD values propagate from the goal one step at a time.</p>
+                    <div class="voice-controls"><button class="listen-btn">🔊 Listen</button><button class="stop-btn">🔇 Stop</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= Q-LEARNING PAGE ======================= -->
+        <section id="page-q" class="page">
+             <header><h1>Q-Learning</h1><p>Learning the value of taking a specific <strong>action</strong> in each state.</p></header>
+            <div class="module">
+                <h2>The Optimal Policy Finder</h2>
+                <div class="interactive-area">
+                    <div class="visualization"><canvas id="q-canvas" width="400" height="400"></canvas></div>
+                    <div class="controls">
+                        <div class="control-group"><label>Exploration (ε): <span id="q-epsilon-value">0.3</span></label><input type="range" id="q-epsilon-slider" min="0" max="1" step="0.01" value="0.3"></div>
+                        <div class="control-group"><button id="q-start-btn">Start</button><button id="q-reset-btn">Reset</button></div>
+                        <div class="results-display"><p>Episodes: <span id="q-episode-count">0</span></p><p>Steps: <span id="q-step-count">0</span></p></div>
+                    </div>
+                </div>
+                <div class="explanation">
+                    <h3>How it Works</h3>
+                    <p class="explanation-text">The agent learns a "Q-table", storing a value for each action (up, down, left, right) in every square. The arrow shows the action with the highest Q-value—the learned policy. Q-Learning is "off-policy": even when exploring, its learning update considers the best possible next action. This allows it to learn the optimal path while exploring.</p>
+                    <div class="voice-controls"><button class="listen-btn">🔊 Listen</button><button class="stop-btn">🔇 Stop</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= SARSA PAGE ======================= -->
+        <section id="page-sarsa" class="page">
+             <header><h1>SARSA vs. Q-Learning</h1><p>On-Policy vs. Off-Policy: The Cautious vs. The Reckless Hiker.</p></header>
+            <div class="module">
+                <h2 id="sarsa-module-title">The Cliff Walking Challenge</h2>
+                <div class="interactive-area">
+                    <div class="visualization"><canvas id="sarsa-canvas" width="600" height="200"></canvas></div>
+                    <div class="controls">
+                        <div class="control-group"><label>Hiker Personality</label><select id="sarsa-algorithm-selector"><option value="sarsa">Cautious Hiker (SARSA)</option><option value="q_learning">Reckless Hiker (Q-Learning)</option></select></div>
+                        <div class="control-group"><label>Animation Speed: <span id="sarsa-speed-value">50</span>ms</label><input type="range" id="sarsa-speed-slider" min="10" max="500" step="10" value="50"></div>
+                        <div class="control-group"><label>Exploration (ε): <span id="sarsa-epsilon-value">0.1</span></label><input type="range" id="sarsa-epsilon-slider" min="0.01" max="0.5" step="0.01" value="0.1"></div>
+                        <div class="control-group"><button id="sarsa-start-btn">Start</button><button id="sarsa-reset-btn">Reset</button></div>
+                        <div class="results-display"><p>Episodes: <span id="sarsa-episode-count">0</span></p><p>Falls off Cliff: <span id="sarsa-fall-count">0</span></p></div>
+                    </div>
+                </div>
+                <div id="sarsa-explanation-box" class="explanation"></div>
+            </div>
+        </section>
+        
+        <!-- ======================= DQN PAGE ======================= -->
+        <section id="page-dqn" class="page">
+             <header><h1 id="dqn-main-title">Double DQN vs. DQN</h1><p>Using neural networks, experience replay, and stable targets to learn.</p></header>
+            <div class="module">
+                <div class="main-layout">
+                    <div class="panel environment-panel"><h3>1. Environment</h3><canvas id="dqn-canvas" width="400" height="400"></canvas></div>
+                    <div class="panel memory-panel"><h3>2. Experience Replay</h3><div id="dqn-replay-buffer"></div></div>
+                    <div class="panel brains-panel">
+                        <h3>3. Brains & Learning</h3>
+                        <div class="control-group"><label>Algorithm</label><select id="dqn-algorithm-selector"><option value="ddqn">Double DQN</option><option value="dqn">Standard DQN</option></select></div>
+                        <div class="network-box"><h4><span class="main-net-color">Main Q-Network</span> (Student)</h4></div>
+                        <div class="network-box"><h4><span class="target-net-color">Target Q-Network</span> (Teacher)</h4><div id="dqn-target-update-progress-bar"><div id="dqn-target-update-progress"></div></div></div>
+                        <div id="dqn-calculation-box"></div>
+                        <div class="control-group"><button id="dqn-start-btn">Start</button><button id="dqn-reset-btn" style="background-color: var(--secondary-color);">Reset</button></div>
+                    </div>
+                </div>
+                <div id="dqn-explanation-box" class="explanation"></div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- GLOBAL NAVIGATION AND VOICE CONTROL ---
+        const navLinks = document.querySelectorAll('.nav-links a');
+        const pages = document.querySelectorAll('.page');
+        const activeSimulations = {};
+        const synth = window.speechSynthesis;
+        let currentUtterance = null;
+
+        function speak(text, listenBtn, stopBtn) {
+            if (synth.speaking) synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            currentUtterance = utterance;
+            utterance.onstart = () => { listenBtn.style.display = 'none'; stopBtn.style.display = 'inline-block'; };
+            utterance.onend = () => { if(stopBtn) stopBtn.style.display = 'none'; if(listenBtn) listenBtn.style.display = 'inline-block'; currentUtterance = null; };
+            synth.speak(utterance);
+        }
+        function stopSpeaking() { if (synth.speaking) synth.cancel(); }
+
+        function setupVoiceControls(pageElement) {
+            pageElement.querySelectorAll('.voice-controls').forEach(control => {
+                const listenBtn = control.querySelector('.listen-btn');
+                const stopBtn = control.querySelector('.stop-btn');
+                const explanationText = control.parentElement.querySelector('.explanation-text, p').textContent;
+                if ('speechSynthesis' in window) {
+                    listenBtn.addEventListener('click', () => speak(explanationText, listenBtn, stopBtn));
+                    stopBtn.addEventListener('click', stopSpeaking);
+                } else {
+                    listenBtn.disabled = true; listenBtn.textContent = 'Speech Not Supported';
+                }
+            });
+        }
+        
+        function switchPage(pageId) {
+            Object.values(activeSimulations).forEach(sim => sim.stop());
+            stopSpeaking();
+            pages.forEach(page => page.classList.remove('active'));
+            navLinks.forEach(link => link.classList.remove('active'));
+            const newPage = document.getElementById(pageId);
+            const newLink = document.querySelector(`.nav-links a[data-page="${pageId}"]`);
+            if (newPage) newPage.classList.add('active');
+            if (newLink) newLink.classList.add('active');
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const pageId = link.getAttribute('data-page'); window.location.hash = link.getAttribute('href'); switchPage(pageId); });
+        });
+        
+        const initialPage = window.location.hash ? `page-${window.location.hash.substring(1)}` : 'page-mc';
+        switchPage(initialPage);
+        
+        // --- SCOPED SIMULATION SCRIPTS ---
+
+        // ======================= MONTE CARLO =======================
+        (() => {
+            const pageId = 'mc';
+            const svg = document.getElementById('mc-pi-svg'), startBtn = document.getElementById('mc-pi-start-btn'), resetBtn = document.getElementById('mc-pi-reset-btn'), speedSlider = document.getElementById('mc-pi-speed'), speedVal = document.getElementById('mc-pi-speed-value'), totalSpan = document.getElementById('mc-pi-total-dots'), insideSpan = document.getElementById('mc-pi-inside-dots'), estSpan = document.getElementById('mc-pi-estimate');
+            let total = 0, inside = 0, isSim = false, animId;
+            function run() {
+                if (!isSim) return;
+                const speed = parseInt(speedSlider.value);
+                for (let i = 0; i < speed; i++) {
+                    const x = Math.random(), y = Math.random(), dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    total++; dot.setAttribute("cx", x*300); dot.setAttribute("cy", y*300); dot.setAttribute("r", 1.5);
+                    if (x*x + y*y <= 1) { inside++; dot.setAttribute("fill", 'var(--dot-in)'); } else { dot.setAttribute("fill", 'var(--dot-out)'); }
+                    svg.appendChild(dot);
+                }
+                estSpan.textContent = (total > 0 ? 4*(inside/total) : 0).toFixed(4); totalSpan.textContent = total.toLocaleString(); insideSpan.textContent = inside.toLocaleString(); animId = requestAnimationFrame(run);
+            }
+            function stop() { isSim = false; startBtn.textContent = 'Resume'; cancelAnimationFrame(animId); }
+            function reset() { stop(); startBtn.textContent = 'Start'; total = 0; inside = 0; totalSpan.textContent = '0'; insideSpan.textContent = '0'; estSpan.textContent = '0.0000'; while (svg.children.length > 2) svg.removeChild(svg.lastChild); }
+            startBtn.addEventListener('click', () => { isSim = !isSim; startBtn.textContent = isSim ? 'Pause' : 'Resume'; if (isSim) run(); });
+            resetBtn.addEventListener('click', reset);
+            speedSlider.addEventListener('input', () => speedVal.textContent = speedSlider.value);
+            setupVoiceControls(document.getElementById('page-mc')); activeSimulations[pageId] = { stop };
+        })();
+        
+        // ======================= TD LEARNING =======================
+        (() => {
+            const pageId = 'td';
+            const canvas = document.getElementById('td-canvas'), ctx = canvas.getContext('2d'), selector = document.getElementById('td-algorithm-selector'), alphaSlider = document.getElementById('td-alpha-slider'), alphaVal = document.getElementById('td-alpha-value'), startBtn = document.getElementById('td-start-btn'), resetBtn = document.getElementById('td-reset-btn'), episodeSpan = document.getElementById('td-episode-count'), stepSpan = document.getElementById('td-step-count');
+            const GRID=10, CELL=canvas.width/GRID, GOAL={x:GRID-1,y:GRID-1}, TRAP={x:GRID-2,y:3}, START={x:0,y:0}, GAMMA=0.9;
+            let V, agent, episodes, steps, isSim=false, alpha, history, animId;
+            function init() { V={}; for(let y=0;y<GRID;y++) for(let x=0;x<GRID;x++) V[`${x},${y}`]=0; agent={...START}; episodes=0; steps=0; episodeSpan.textContent=0; stepSpan.textContent=0; draw(); alpha=parseFloat(alphaSlider.value); }
+            function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); for(let y=0;y<GRID;y++){ for(let x=0;x<GRID;x++){ const val=V[`${x},${y}`]; ctx.fillStyle=val>0?`rgba(40,167,69,${Math.min(val,1)})`:`rgba(220,53,69,${Math.min(Math.abs(val),1)})`; if(x===GOAL.x&&y===GOAL.y)ctx.fillStyle='var(--goal-color)'; if(x===TRAP.x&&y===TRAP.y)ctx.fillStyle='var(--trap-color)'; ctx.fillRect(x*CELL,y*CELL,CELL,CELL); ctx.strokeStyle='#ccc'; ctx.strokeRect(x*CELL,y*CELL,CELL,CELL); ctx.fillStyle='#000';ctx.font='10px Arial';ctx.textAlign='center';ctx.fillText(val.toFixed(2),x*CELL+CELL/2,y*CELL+CELL/2);}} ctx.fillStyle='var(--agent-color)';ctx.beginPath();ctx.arc(agent.x*CELL+CELL/2,agent.y*CELL+CELL/2,CELL/3,0,2*Math.PI);ctx.fill(); }
+            function step() { const oldS={...agent}, action=Math.floor(Math.random()*4); if(action===0)agent.y=Math.max(0,agent.y-1);else if(action===1)agent.y=Math.min(GRID-1,agent.y+1);else if(action===2)agent.x=Math.max(0,agent.x-1);else agent.x=Math.min(GRID-1,agent.x+1); let r=-0.01,done=false; if(agent.x===GOAL.x&&agent.y===GOAL.y){r=1;done=true;} if(agent.x===TRAP.x&&agent.y===TRAP.y){r=-1;done=true;} steps++; return {oldS,r,newS:{...agent},done}; }
+            function updateTD(s) { const oldK=`${s.oldS.x},${s.oldS.y}`, newK=`${s.newS.x},${s.newS.y}`; V[oldK]+=alpha*(s.r+GAMMA*V[newK]-V[oldK]); }
+            function updateMC(h, G) { for(let i=h.length-1;i>=0;i--){ const{s,r}=h[i];G=GAMMA*G+r;if(!h.slice(0,i).some(step=>step.s.x===s.x&&step.s.y===s.y))V[`${s.x},${s.y}`]+=alpha*(G-V[`${s.x},${s.y}`]);}}
+            function runLoop() { if(!isSim)return; for(let i=0;i<20;i++){if(selector.value==='td'){const s=step();updateTD(s);if(s.done){agent={...START};episodes++;}}else{agent={...START};history=[];let done=false,G=0;while(!done){const s=step();history.push({s:s.oldS,r:s.r});G=s.r;done=s.done;}updateMC(history,G);episodes++;}}episodeSpan.textContent=episodes;stepSpan.textContent=steps;draw();animId=requestAnimationFrame(runLoop);}
+            function stop(){isSim=false;startBtn.textContent='Resume';cancelAnimationFrame(animId);}
+            function reset(){stop();startBtn.textContent='Start';init();}
+            startBtn.addEventListener('click', ()=>{isSim=!isSim;startBtn.textContent=isSim?'Pause':'Resume';if(isSim)runLoop();});
+            resetBtn.addEventListener('click',reset); selector.addEventListener('change',reset); alphaSlider.addEventListener('input', e => {alpha=parseFloat(e.target.value);alphaVal.textContent = alpha.toFixed(2);});
+            init(); setupVoiceControls(document.getElementById('page-td')); activeSimulations[pageId] = {stop};
+        })();
+
+        // ======================= Q-LEARNING =======================
+        (() => {
+            const pageId = 'q';
+            const canvas = document.getElementById('q-canvas'), ctx = canvas.getContext('2d'), epsilonSlider = document.getElementById('q-epsilon-slider'), epsilonVal = document.getElementById('q-epsilon-value'), startBtn = document.getElementById('q-start-btn'), resetBtn = document.getElementById('q-reset-btn'), episodeSpan = document.getElementById('q-episode-count'), stepSpan = document.getElementById('q-step-count');
+            const GRID=10, CELL=canvas.width/GRID, GOAL={x:GRID-1,y:0}, TRAP={x:GRID-1,y:GRID-1}, START={x:0,y:0}, ACTIONS=['up','down','left','right'], ALPHA=0.5, GAMMA=0.9;
+            let Q, agent, episodes, steps, isSim=false, epsilon, animId;
+            function init() { Q={};for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++)Q[`${x},${y}`]={up:0,down:0,left:0,right:0};agent={...START};episodes=0;steps=0;episodeSpan.textContent=0;stepSpan.textContent=0;draw();epsilon=parseFloat(epsilonSlider.value);}
+            function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); for(let y=0;y<GRID;y++) for(let x=0;x<GRID;x++){ ctx.fillStyle="#fff"; if(x===GOAL.x&&y===GOAL.y)ctx.fillStyle='var(--goal-color)'; if(x===TRAP.x&&y===TRAP.y)ctx.fillStyle='var(--trap-color)'; ctx.fillRect(x*CELL,y*CELL,CELL,CELL); const q_values=Q[`${x},${y}`]; const best=Object.keys(q_values).reduce((a,b)=>q_values[a]>q_values[b]?a:b); if(Q[`${x},${y}`][best]!==0){const cX=x*CELL+CELL/2,cY=y*CELL+CELL/2,sz=CELL/5; ctx.fillStyle='#333';ctx.beginPath(); switch(best){case'up':ctx.moveTo(cX,cY-sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'down':ctx.moveTo(cX,cY+sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'left':ctx.moveTo(cX-sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;case'right':ctx.moveTo(cX+sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;} ctx.closePath();ctx.fill();} ctx.strokeStyle='#eee';ctx.strokeRect(x*CELL,y*CELL,CELL,CELL); } ctx.fillStyle='var(--agent-color)';ctx.beginPath();ctx.arc(agent.x*CELL+CELL/2,agent.y*CELL+CELL/2,CELL/3,0,2*Math.PI);ctx.fill();}
+            function chooseAction(s){if(Math.random()<epsilon)return ACTIONS[Math.floor(Math.random()*4)];const q=Q[`${s.x},${s.y}`]; return Object.keys(q).reduce((a,b)=>q[a]>q[b]?a:b);}
+            function step(a){const oldS={...agent};switch(a){case'up':agent.y=Math.max(0,agent.y-1);break;case'down':agent.y=Math.min(GRID-1,agent.y+1);break;case'left':agent.x=Math.max(0,agent.x-1);break;case'right':agent.x=Math.min(GRID-1,agent.x+1);break;}let r=-0.01,done=false;if(agent.x===GOAL.x&&agent.y===GOAL.y){r=1;done=true;}if(agent.x===TRAP.x&&agent.y===TRAP.y){r=-1;done=true;}steps++;return{oldS,r,newS:{...agent},done};}
+            function updateQ(s,a){const oldK=`${s.oldS.x},${s.oldS.y}`,newK=`${s.newS.x},${s.newS.y}`,oldQ=Q[oldK][a],maxNextQ=Math.max(...Object.values(Q[newK]));Q[oldK][a]+=ALPHA*(s.r+GAMMA*maxNextQ-oldQ);}
+            function runLoop(){if(!isSim)return; for(let i=0;i<25;i++){const a=chooseAction(agent),s=step(a);updateQ(s,a);if(s.done){agent={...START};episodes++;}}episodeSpan.textContent=episodes;stepSpan.textContent=steps;draw();animId=requestAnimationFrame(runLoop);}
+            function stop(){isSim=false;startBtn.textContent='Resume';cancelAnimationFrame(animId);}
+            function reset(){stop();startBtn.textContent='Start';init();}
+            startBtn.addEventListener('click',()=>{isSim=!isSim;startBtn.textContent=isSim?'Pause':'Resume';if(isSim)runLoop();});
+            resetBtn.addEventListener('click',reset);epsilonSlider.addEventListener('input', e => {epsilon=parseFloat(e.target.value);epsilonVal.textContent=epsilon.toFixed(2)});
+            init();setupVoiceControls(document.getElementById('page-q'));activeSimulations[pageId]={stop};
+        })();
+
+        // ======================= SARSA =======================
+        (() => {
+            const pageId = 'sarsa';
+            const canvas = document.getElementById('sarsa-canvas'), ctx = canvas.getContext('2d'), selector = document.getElementById('sarsa-algorithm-selector'), speedSlider = document.getElementById('sarsa-speed-slider'), speedVal = document.getElementById('sarsa-speed-value'), epsilonSlider = document.getElementById('sarsa-epsilon-slider'), epsilonVal = document.getElementById('sarsa-epsilon-value'), startBtn = document.getElementById('sarsa-start-btn'), resetBtn = document.getElementById('sarsa-reset-btn'), episodeSpan = document.getElementById('sarsa-episode-count'), fallSpan = document.getElementById('sarsa-fall-count'), title = document.getElementById('sarsa-module-title'), explanationBox = document.getElementById('sarsa-explanation-box');
+            const GW=12,GH=4,CELL=canvas.width/GW,GOAL={x:GW-1,y:GH-1},START={x:0,y:GH-1},ACTIONS=['up','down','left','right'],ALPHA=0.5,GAMMA=0.9;
+            let Q,agent,epsilon,falls,episodes,isSim=false,interval,speed,path,currentAction;
+            const explanations = { sarsa: `<h3 class="sarsa-color">Cautious Hiker (SARSA)</h3><p class="explanation-text">This on-policy hiker learns based on its actual actions, including exploratory mistakes. It learns the safest path is best, even if it's longer.</p>`, q_learning: `<h3 class="q-learning-color">Reckless Hiker (Q-Learning)</h3><p class="explanation-text">This off-policy hiker learns the "textbook" perfect path, ignoring its own mistakes. It learns the shortest path is best, no matter the risk.</p>`};
+            function isCliff(x,y){return y===GH-1&&x>0&&x<GW-1;}
+            function init(){Q={};for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)Q[`${x},${y}`]={up:0,down:0,left:0,right:0};agent={...START};episodes=0;falls=0;path=[{...START}];episodeSpan.textContent=0;fallSpan.textContent=0;currentAction=null;draw();}
+            function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){ctx.fillStyle=isCliff(x,y)?'var(--cliff-color)':"#fff";if(x===GOAL.x&&y===GOAL.y)ctx.fillStyle='var(--goal-color)';ctx.fillRect(x*CELL,y*CELL,CELL,CELL);if(!isCliff(x,y)){const q=Q[`${x},${y}`];if(Math.max(...Object.values(q))!==0){const best=Object.keys(q).reduce((a,b)=>q[a]>q[b]?a:b),cX=x*CELL+CELL/2,cY=y*CELL+CELL/2,sz=CELL/5;ctx.fillStyle='#333';ctx.beginPath();switch(best){case'up':ctx.moveTo(cX,cY-sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'down':ctx.moveTo(cX,cY+sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'left':ctx.moveTo(cX-sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;case'right':ctx.moveTo(cX+sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;}ctx.closePath();ctx.fill();}}ctx.strokeStyle='#eee';ctx.strokeRect(x*CELL,y*CELL,CELL,CELL);}ctx.strokeStyle='rgba(0,123,255,0.5)';ctx.lineWidth=5;ctx.beginPath();if(path.length>0){ctx.moveTo(path[0].x*CELL+CELL/2,path[0].y*CELL+CELL/2);path.forEach(p=>ctx.lineTo(p.x*CELL+CELL/2,p.y*CELL+CELL/2));ctx.stroke();}ctx.fillStyle='#fff';ctx.font='12px Arial';ctx.textAlign='center';ctx.fillText('START',START.x*CELL+CELL/2,START.y*CELL+CELL/2);ctx.fillText('GOAL',GOAL.x*CELL+CELL/2,GOAL.y*CELL+CELL/2);ctx.fillStyle='var(--agent-color)';ctx.beginPath();ctx.arc(agent.x*CELL+CELL/2,agent.y*CELL+CELL/2,CELL/3,0,2*Math.PI);ctx.fill();}
+            function chooseAction(s){if(Math.random()<epsilon)return ACTIONS[Math.floor(Math.random()*4)];const q=Q[`${s.x},${s.y}`];return Object.keys(q).reduce((a,b)=>q[a]>q[b]?a:b);}
+            function step(a){const oldS={...agent};switch(a){case'up':agent.y=Math.max(0,agent.y-1);break;case'down':agent.y=Math.min(GH-1,agent.y+1);break;case'left':agent.x=Math.max(0,agent.x-1);break;case'right':agent.x=Math.min(GW-1,agent.x+1);break;}path.push({...agent});let r=-1,done=false;if(isCliff(agent.x,agent.y)){r=-100;done=true;falls++;fallSpan.textContent=falls;}else if(agent.x===GOAL.x&&agent.y===GOAL.y)done=true;return{oldS,r,newS:{...agent},done};}
+            function updateQ(s,a){const oldK=`${s.oldS.x},${s.oldS.y}`,newK=`${s.newS.x},${s.newS.y}`;const oldQ=Q[oldK][a],maxNextQ=s.done?0:Math.max(...Object.values(Q[newK]));Q[oldK][a]+=ALPHA*(s.r+GAMMA*maxNextQ-oldQ);}
+            function updateSarsa(s,a,nextA){const oldK=`${s.oldS.x},${s.oldS.y}`,newK=`${s.newS.x},${s.newS.y}`;const oldQ=Q[oldK][a],nextQ=s.done?0:Q[newK][nextA];Q[oldK][a]+=ALPHA*(s.r+GAMMA*nextQ-oldQ);}
+            function simStep(){if(!isSim)return;const s={...agent};if(!currentAction)currentAction=chooseAction(s);const stepRes=step(currentAction);const nextA=chooseAction(stepRes.newS);if(selector.value==='q_learning')updateQ(stepRes,currentAction);else updateSarsa(stepRes,currentAction,nextA);currentAction=nextA;if(stepRes.done){agent={...START};episodes++;episodeSpan.textContent=episodes;currentAction=null;path=[{...START}];}draw();}
+            function stop(){isSim=false;startBtn.textContent='Resume';clearInterval(interval);}
+            function reset(){stop();startBtn.textContent='Start';init();}
+            function updateUI(){const s=selector.value;title.textContent=s==='sarsa'?'Cautious Hiker (SARSA)':'Reckless Hiker (Q-Learning)';startBtn.style.backgroundColor=s==='sarsa'?'var(--sarsa-color)':'var(--q-learning-color)';explanationBox.innerHTML=explanations[s]+`<div class="voice-controls"><button class="listen-btn">🔊 Listen</button><button class="stop-btn">🔇 Stop</button></div>`;const vc=explanationBox.querySelector('.voice-controls'),listenBtn=vc.querySelector('.listen-btn'),stopBtn=vc.querySelector('.stop-btn');listenBtn.addEventListener('click',()=>speak(vc.previousElementSibling.textContent,listenBtn,stopBtn));stopBtn.addEventListener('click',stopSpeaking);reset();}
+            startBtn.addEventListener('click', ()=>{isSim=!isSim;startBtn.textContent=isSim?'Pause':'Resume';if(isSim){clearInterval(interval);interval=setInterval(simStep,speed);}else clearInterval(interval);});
+            resetBtn.addEventListener('click',updateUI);selector.addEventListener('change',updateUI);
+            speedSlider.addEventListener('input',e=>{speed=parseInt(e.target.value);speedVal.textContent=`${speed}ms`;if(isSim){clearInterval(interval);interval=setInterval(simStep,speed);}});
+            epsilonSlider.addEventListener('input',e=>{epsilon=parseFloat(e.target.value);epsilonVal.textContent=epsilon.toFixed(2);});
+            speed=parseInt(speedSlider.value);epsilon=parseFloat(epsilonSlider.value);updateUI();activeSimulations[pageId]={stop};
+        })();
+
+        // ======================= DQN =======================
+        (() => {
+            const pageId = 'dqn';
+            const canvas = document.getElementById('dqn-canvas'), ctx = canvas.getContext('2d'), selector = document.getElementById('dqn-algorithm-selector'), startBtn = document.getElementById('dqn-start-btn'), resetBtn = document.getElementById('dqn-reset-btn'), title = document.getElementById('dqn-main-title'), explanationBox = document.getElementById('dqn-explanation-box'), calcBox = document.getElementById('dqn-calculation-box'), bufferDiv=document.getElementById('dqn-replay-buffer'), progress=document.getElementById('dqn-target-update-progress');
+            const GRID=10,CELL=canvas.width/GRID,GOAL={x:GRID-1,y:0},TRAP={x:GRID-1,y:GRID-1},START={x:0,y:0},ACTIONS=['up','down','left','right'],CAP=500,BATCH=16,UPDATE_FREQ=150,GAMMA=0.9,ALPHA=0.5,EPSILON=0.2;
+            let Qm,Qt,agent,buffer,steps,isSim=false,interval;
+            const explanations = {dqn:`<h3>Standard DQN: The Optimist</h3><p class="explanation-text">DQN uses its stable Target Network for two things: to <strong>choose</strong> the best next action AND to <strong>evaluate</strong> that action's value. This can lead to over-optimism.</p>`, ddqn:`<h3>Double DQN: The Realist</h3><p class="explanation-text">Double DQN decouples these steps. It uses the Main Network to <strong>choose</strong> the action, but the Target Network to <strong>evaluate</strong> it. This reduces optimism and improves stability.</p>`};
+            const deepCopy = o => JSON.parse(JSON.stringify(o));
+            function init(){Qm={};Qt={};for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++)Qm[`${x},${y}`]={up:0,down:0,left:0,right:0};Qt=deepCopy(Qm);agent={...START};buffer=[];bufferDiv.innerHTML='';steps=0;draw();}
+            function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);for(let y=0;y<GRID;y++){for(let x=0;x<GRID;x++){ctx.fillStyle="#fff";if(x===GOAL.x&&y===GOAL.y)ctx.fillStyle='var(--goal-color)';else if(x===TRAP.x&&y===TRAP.y)ctx.fillStyle='var(--trap-color)';ctx.fillRect(x*CELL,y*CELL,CELL,CELL);const bestA=Object.keys(Qm[`${x},${y}`]).reduce((a,b)=>Qm[`${x},${y}`][a]>Qm[`${x},${y}`][b]?a:b),qV=Qm[`${x},${y}`][bestA];if(qV!==0){const cX=x*CELL+CELL/2,cY=y*CELL+CELL/2,sz=CELL/5;ctx.fillStyle=qV>0?'rgba(0,0,0,0.5)':'rgba(255,0,0,0.5)';ctx.beginPath();switch(bestA){case'up':ctx.moveTo(cX,cY-sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'down':ctx.moveTo(cX,cY+sz);ctx.lineTo(cX-sz,cY);ctx.lineTo(cX+sz,cY);break;case'left':ctx.moveTo(cX-sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;case'right':ctx.moveTo(cX+sz,cY);ctx.lineTo(cX,cY-sz);ctx.lineTo(cX,cY+sz);break;}ctx.closePath();ctx.fill();}ctx.strokeStyle='#eee';ctx.strokeRect(x*CELL,y*CELL,CELL,CELL);}}ctx.fillStyle='var(--agent-color)';ctx.beginPath();ctx.arc(agent.x*CELL+CELL/2,agent.y*CELL+CELL/2,CELL/3,0,2*Math.PI);ctx.fill();}
+            function chooseAction(s){if(Math.random()<EPSILON)return ACTIONS[Math.floor(Math.random()*4)];const q=Qm[`${s.x},${s.y}`];return Object.keys(q).reduce((a,b)=>q[a]>q[b]?a:b);}
+            function step(a){const oldS={...agent};switch(a){case'up':agent.y=Math.max(0,agent.y-1);break;case'down':agent.y=Math.min(GRID-1,agent.y+1);break;case'left':agent.x=Math.max(0,agent.x-1);break;case'right':agent.x=Math.min(GRID-1,agent.x+1);break;}let r=-0.01,done=false;if(agent.x===GOAL.x&&agent.y===GOAL.y){r=1;done=true;}else if(agent.x===TRAP.x&&agent.y===TRAP.y){r=-1;done=true;}return{oldS,a,r,newS:{...agent},done};}
+            function store(exp){if(buffer.length>=CAP){buffer.shift();bufferDiv.removeChild(bufferDiv.firstChild);}buffer.push(exp);const div=document.createElement('div');div.className='memory-item';div.textContent=`S:(${exp.oldS.x},${exp.oldS.y}),A:${exp.a.charAt(0)},R:${exp.r.toFixed(1)}`;exp.dom=div;bufferDiv.appendChild(div);bufferDiv.scrollTop=bufferDiv.scrollHeight;}
+            function learn(){if(buffer.length<BATCH)return;const batch=Array.from({length:BATCH},()=>buffer[Math.floor(Math.random()*buffer.length)]);const vis=batch[0];vis.dom.classList.add('sampling');setTimeout(()=>vis.dom.classList.remove('sampling'),500);for(const{oldS,a,r,newS,done} of batch){const oldK=`${oldS.x},${oldS.y}`,newK=`${newS.x},${newS.y}`;const oldQ=Qm[oldK][a];let target;if(done)target=r;else{if(selector.value==='dqn'){const maxNextQ=Math.max(...Object.values(Qt[newK]));target=r+GAMMA*maxNextQ;if(oldS===vis.oldS)showCalcDQN(r,maxNextQ,target);}else{const bestA=Object.keys(Qm[newK]).reduce((a,b)=>Qm[newK][a]>Qm[newK][b]?a:b);const qVal=Qt[newK][bestA];target=r+GAMMA*qVal;if(oldS===vis.oldS)showCalcDDQN(r,bestA,qVal,target);}}Qm[oldK][a]+=ALPHA*(target-oldQ);}}
+            function showCalcDQN(r,max_q,t){calcBox.innerHTML=`<strong>DQN Target</strong><div class="calc-step">1. Max Q from <span class="target-net-color">Target</span>: ${max_q.toFixed(3)}</div><div class="calc-step">2. Target = ${r.toFixed(2)}+${GAMMA}*${max_q.toFixed(3)}=<strong>${t.toFixed(3)}</strong></div>`;calcBox.classList.add('visible');setTimeout(()=>calcBox.classList.remove('visible'),2500);}
+            function showCalcDDQN(r,best_a,q_val,t){calcBox.innerHTML=`<strong>DDQN Target</strong><div class="calc-step">1. Best A from <span class="main-net-color">Main</span>: '${best_a}'</div><div class="calc-step">2. Get Q('${best_a}') from <span class="target-net-color">Target</span>: ${q_val.toFixed(3)}</div><div class="calc-step">3. Target=<strong>${t.toFixed(3)}</strong></div>`;calcBox.classList.add('visible');setTimeout(()=>calcBox.classList.remove('visible'),2500);}
+            function simStep(){if(!isSim)return;const exp=step(chooseAction(agent));store(exp);learn();steps++;if(steps%UPDATE_FREQ===0)Qt=deepCopy(Qm);if(exp.done)agent={...START};progress.style.width=`${(steps%UPDATE_FREQ)/UPDATE_FREQ*100}%`;draw();}
+            function stop(){isSim=false;startBtn.textContent='Resume';clearInterval(interval);}
+            function reset(){stop();startBtn.textContent='Start';init();}
+            function updateUI(){const s=selector.value;const c=s==='dqn'?'var(--dqn-color)':'var(--ddqn-color)';title.style.color=c;explanationBox.className=`explanation ${s}`;explanationBox.innerHTML=explanations[s]+`<div class="voice-controls"><button class="listen-btn">🔊 Listen</button><button class="stop-btn">🔇 Stop</button></div>`;calcBox.style.borderColor=c;progress.style.backgroundColor=c;startBtn.style.backgroundColor=c;const vc=explanationBox.querySelector('.voice-controls'),listenBtn=vc.querySelector('.listen-btn'),stopBtn=vc.querySelector('.stop-btn');listenBtn.addEventListener('click',()=>speak(vc.previousElementSibling.textContent,listenBtn,stopBtn));stopBtn.addEventListener('click',stopSpeaking);reset();}
+            startBtn.addEventListener('click', ()=>{isSim=!isSim;startBtn.textContent=isSim?'Pause':'Resume';if(isSim){clearInterval(interval);interval=setInterval(simStep,100);}else clearInterval(interval);});
+            resetBtn.addEventListener('click',updateUI);selector.addEventListener('change',updateUI);
+            updateUI();activeSimulations[pageId]={stop};
+        })();
+
+    });
+    </script>
+</body>
+</html>
